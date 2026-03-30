@@ -1,85 +1,154 @@
-# Claude Server Setup — Auto-Configuration Guide
+# Claude Server Setup
 
-You are helping the user set up a cloud server for running Claude Code with Telegram integration. The bootstrap script has already installed Claude Code, Bun, Node.js, and GitHub CLI. Your job is to finish the setup.
+You are guiding the user through setting up a cloud server for running Claude Code with Telegram integration. The user may have zero technical knowledge — explain everything simply, tell them exactly what to do, and do as much as possible yourself.
 
-## First Interaction
+## When the user shares this repo or asks to set up
 
-When the user says "set it up" or similar, explain what you're about to do:
-
----
-
-I'll set up this server as a persistent Claude Code environment with Telegram integration. Here's what I'll do:
-
-1. **Install dependencies** — ffmpeg (audio), whisper-cpp (voice transcription), cmake
-2. **Set up Telegram plugin** — install the official plugin, apply patches (zombie process fix + voice transcription)
-3. **Configure your Telegram bot** — you'll need a bot token from @BotFather
-4. **Create project sessions** — tmux sessions for each project, each with its own bot
-5. **Test everything** — verify text and voice messages work
-
-The whole process takes about 5-10 minutes. I'll ask you a few questions along the way. Ready?
+Start by explaining the end result:
 
 ---
 
-Wait for confirmation before proceeding.
+This will set up a cloud server where Claude Code runs 24/7 with Telegram. You'll be able to:
+- Chat with Claude from your phone via Telegram (text and voice messages)
+- Have separate bots for different projects
+- Voice messages are automatically transcribed — no API keys, runs locally on the server
 
-## Step 1: Install Dependencies
+Here's what we'll do together:
+1. Get your Claude auth token (so the server can use your subscription)
+2. Get a server (if you don't have one already)
+3. I'll install everything on the server via SSH
+4. Set up your Telegram bot(s)
+5. Test it all
 
-```bash
-sudo apt-get install -y -qq ffmpeg cmake build-essential
+Let's start! Do you already have a VPS/cloud server, or do we need to set one up?
+
+---
+
+## Phase 1: Auth Token
+
+Tell the user:
+
+"First, I need your Claude Code auth token. Open a new terminal tab and run:"
+
+```
+claude setup-token
 ```
 
-### Build whisper-cpp
+"This will open your browser — sign in, and it'll save a token. Then run:"
 
-```bash
-cd /tmp
-rm -rf whisper.cpp
-git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git
-cd whisper.cpp
-cmake -B build
-cmake --build build --config Release -j$(nproc)
-sudo cp build/bin/whisper-cli /usr/local/bin/whisper-cpp || sudo cp build/bin/main /usr/local/bin/whisper-cpp
-sudo chmod +x /usr/local/bin/whisper-cpp
-cd ~
+```
+cat ~/.claude/.setup-token
 ```
 
-### Download Whisper model
+"Paste the token here."
 
-Ask the user: "Which Whisper model? `small` (466MB, good balance) or `medium` (1.5GB, better for non-English)?"
+**Important:** Store the token in a variable. NEVER display it back to the user or include it in any output visible to others.
 
+## Phase 2: Server
+
+### If the user already has a server
+
+Ask: "What's the SSH command to connect? Something like `ssh user@1.2.3.4` or `ssh -i key.pem user@ip`"
+
+Test the connection:
 ```bash
-mkdir -p ~/.local/share/whisper-models
-curl -L --progress-bar -o ~/.local/share/whisper-models/ggml-<MODEL>.bin \
-  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-<MODEL>.bin"
+ssh <their-command> "uname -a && echo 'SSH works'"
 ```
 
-## Step 2: Set Up Telegram Plugin
+### If they need a server
 
-### Enable plugin
+Ask: "Which cloud provider do you have an account with? AWS, DigitalOcean, Vultr, Hetzner, or something else?"
 
-Check `~/.claude/settings.json` has:
-```json
+Help them create a server:
+- **AWS Lightsail**: Check `aws sts get-caller-identity`, then create via `aws lightsail create-instances`
+- **DigitalOcean**: Check `doctl auth list`, then create via `doctl compute droplet create`
+- **Other**: Guide them through their provider's dashboard
+
+Recommended specs: Ubuntu 22.04+, 4GB RAM, 2 CPU, any region close to them.
+
+After server is created, get the IP and set up SSH access.
+
+## Phase 3: Install Everything
+
+Run these commands on the server via SSH. Execute them yourself — don't ask the user to copy-paste.
+
+### 3.1 System packages
+```bash
+ssh <server> "sudo apt-get update -qq && sudo apt-get install -y -qq git curl tmux ffmpeg jq cmake build-essential"
+```
+
+### 3.2 Node.js + Bun
+```bash
+ssh <server> "curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - > /dev/null 2>&1 && sudo apt-get install -y -qq nodejs"
+ssh <server> 'curl -fsSL https://bun.sh/install | bash > /dev/null 2>&1'
+```
+
+### 3.3 Claude Code + GitHub CLI
+```bash
+ssh <server> "sudo npm install -g @anthropic-ai/claude-code > /dev/null 2>&1"
+ssh <server> 'curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg > /dev/null 2>&1 && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null && sudo apt-get update -qq && sudo apt-get install -y -qq gh'
+```
+
+### 3.4 Save auth token
+```bash
+ssh <server> "mkdir -p ~/.claude && echo -n '<TOKEN>' > ~/.claude/.setup-token && chmod 600 ~/.claude/.setup-token"
+```
+
+### 3.5 Environment config
+```bash
+ssh <server> 'grep -q "BUN_INSTALL" ~/.bashrc || cat >> ~/.bashrc << '\''BASHRC'\''
+
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
+export CLAUDE_CODE_OAUTH_TOKEN=$(cat ~/.claude/.setup-token 2>/dev/null | tr -d "[:space:]")
+BASHRC'
+```
+
+### 3.6 Claude Code settings
+```bash
+ssh <server> 'cat > ~/.claude/settings.json << '\''JSON'\''
 {
   "enabledPlugins": {
     "telegram@claude-plugins-official": true
-  }
+  },
+  "skipDangerousModePermissionPrompt": true
 }
+JSON'
 ```
 
-### Download the plugin
+### 3.7 Install Superflow skill
 
-Run Claude Code once to trigger plugin download:
 ```bash
-source ~/.bashrc
+ssh <server> 'mkdir -p ~/.claude/commands && cd ~/.claude/commands && git clone https://github.com/egerev/superflow.git 2>/dev/null || true'
+```
+
+### 3.8 Whisper-cpp (voice transcription)
+
+Ask: "Which Whisper model? `small` (466MB, good balance) or `medium` (1.5GB, better for non-English like Russian)?"
+
+```bash
+ssh <server> 'bash -s' << 'WHISPER'
+cd /tmp && rm -rf whisper.cpp
+git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git
+cd whisper.cpp && cmake -B build && cmake --build build --config Release -j$(nproc)
+sudo cp build/bin/whisper-cli /usr/local/bin/whisper-cpp 2>/dev/null || sudo cp build/bin/main /usr/local/bin/whisper-cpp
+sudo chmod +x /usr/local/bin/whisper-cpp
+mkdir -p ~/.local/share/whisper-models
+curl -L --progress-bar -o ~/.local/share/whisper-models/ggml-<MODEL>.bin "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-<MODEL>.bin"
+WHISPER
+```
+
+### 3.8 Telegram plugin + patches
+```bash
+ssh <server> 'bash -s' << 'TELEGRAM'
+export PATH="$HOME/.bun/bin:$PATH"
+export CLAUDE_CODE_OAUTH_TOKEN=$(cat ~/.claude/.setup-token | tr -d '[:space:]')
+
+# Download plugin
 claude -p "ok" --dangerously-skip-permissions 2>&1 || true
-```
+sleep 5
 
-Wait a few seconds, then check:
-```bash
-find ~/.claude/plugins -name 'server.ts' -path '*/telegram/*' 2>/dev/null
-```
-
-If no results, the plugin may need a second attempt or manual clone:
-```bash
+# Also manually ensure plugin exists
 cd /tmp
 git clone --depth 1 https://github.com/anthropics/claude-plugins-official.git 2>/dev/null || true
 MARKET_DIR="$HOME/.claude/plugins/marketplaces/claude-plugins-official/external_plugins/telegram"
@@ -88,168 +157,125 @@ if [ ! -f "$MARKET_DIR/server.ts" ]; then
   cp -r /tmp/claude-plugins-official/external_plugins/telegram/* "$MARKET_DIR/"
   cd "$MARKET_DIR" && bun install --no-summary
 fi
-```
 
-### Apply patches
-
-Clone the upgrade repo and apply patches to ALL plugin locations:
-
-```bash
+# Clone patches and apply
 cd ~
 git clone https://github.com/egerev/claude-telegram-upgrade.git 2>/dev/null || true
-
-PLUGIN_FILES=$(find ~/.claude/plugins -name 'server.ts' -path '*/telegram/*' 2>/dev/null)
-for f in $PLUGIN_FILES; do
+for f in $(find ~/.claude/plugins -name 'server.ts' -path '*/telegram/*' 2>/dev/null); do
   DIR=$(dirname "$f")
   REPO_ROOT=$(echo "$DIR" | sed 's|/external_plugins/telegram||; s|/telegram/[0-9.]*||')
   cd "$REPO_ROOT"
-  git apply ~/claude-telegram-upgrade/patches/all.patch 2>/dev/null && echo "Patched: $f" || echo "Already patched: $f"
+  git apply ~/claude-telegram-upgrade/patches/all.patch 2>/dev/null && echo "Patched: $f" || echo "Skipped: $f"
 done
+TELEGRAM
 ```
 
-Verify patches:
+Tell the user: "Base installation complete. Now let's set up your Telegram bot."
+
+## Phase 4: Telegram Bot Setup
+
+Tell the user:
+
+"Open Telegram on your phone, search for @BotFather, send `/newbot`, and follow the steps. Then paste the bot token here (format: `123456789:AAH...`)"
+
+If they already have a bot token, skip to configuration.
+
+Ask: "What should I call this project? (e.g., `myproject`, `work`, `personal`)"
+
 ```bash
-for f in $PLUGIN_FILES; do
-  echo "$f: $(grep -c 'transcribeVoice\|killOldInstance' "$f") patch markers"
-done
+ssh <server> "mkdir -p ~/.claude/channels/telegram-<PROJECT_NAME> && echo 'TELEGRAM_BOT_TOKEN=<TOKEN>' > ~/.claude/channels/telegram-<PROJECT_NAME>/.env && chmod 600 ~/.claude/channels/telegram-<PROJECT_NAME>/.env"
 ```
 
-## Step 3: Configure Telegram Bot
-
-Ask the user: "Send me your Telegram bot token from @BotFather. Format: `123456789:AAH...`"
-
-If they don't have one, explain:
-1. Open Telegram, search for @BotFather
-2. Send `/newbot`, follow the prompts
-3. Copy the token
-
-For each bot token provided:
+Ask: "Do you have a GitHub repo for this project? If yes, give me the URL or `owner/repo`."
 
 ```bash
-# Ask for a project name
-PROJECT_NAME="<name>"
-
-# Create channel directory
-mkdir -p ~/.claude/channels/telegram-$PROJECT_NAME
-
-# Save token
-echo "TELEGRAM_BOT_TOKEN=<TOKEN>" > ~/.claude/channels/telegram-$PROJECT_NAME/.env
-chmod 600 ~/.claude/channels/telegram-$PROJECT_NAME/.env
-```
-
-## Step 4: Set Up Projects
-
-Ask: "What GitHub repos do you want to connect? Give me the URLs or `owner/repo` names."
-
-For each repo:
-
-```bash
+ssh <server> 'bash -s' << 'PROJECT'
+export PATH="$HOME/.bun/bin:$PATH"
 mkdir -p ~/projects
 cd ~/projects
-gh repo clone <owner/repo> 2>/dev/null || git clone <url>
-```
+gh repo clone <OWNER/REPO> 2>/dev/null || git clone <URL>
 
-If `gh` is not authenticated:
-```bash
-# Ask user for a GitHub token or have them run:
-gh auth login --with-token
-```
-
-Create per-project config:
-
-```bash
-WHISPER_MODEL_PATH=$(find ~/.local/share/whisper-models -name '*.bin' | head -1)
-
-mkdir -p ~/projects/<repo>/.claude
-cat > ~/projects/<repo>/.claude/settings.local.json << JSON
+WHISPER_MODEL=$(find ~/.local/share/whisper-models -name '*.bin' | head -1)
+mkdir -p ~/projects/<REPO>/.claude
+cat > ~/projects/<REPO>/.claude/settings.local.json << JSON
 {
   "env": {
     "TELEGRAM_STATE_DIR": "/home/$(whoami)/.claude/channels/telegram-<PROJECT_NAME>",
-    "TELEGRAM_WHISPER_MODEL": "$WHISPER_MODEL_PATH"
+    "TELEGRAM_WHISPER_MODEL": "$WHISPER_MODEL"
   }
 }
 JSON
+PROJECT
 ```
 
-## Step 5: Create tmux Sessions and Launch
+Ask: "Want to add another project with a different bot? Or is one enough for now?"
+
+Repeat Phase 4 for each additional project.
+
+## Phase 5: Launch
 
 For each project:
 
 ```bash
+ssh <server> 'bash -s' << 'LAUNCH'
+export PATH="$HOME/.bun/bin:$PATH"
 TOKEN=$(cat ~/.claude/.setup-token | tr -d '[:space:]')
 
-tmux new-session -d -s <PROJECT_NAME> -c ~/projects/<repo>
+tmux new-session -d -s <PROJECT_NAME> -c ~/projects/<REPO>
 tmux send-keys -t <PROJECT_NAME> "export PATH=\"\$HOME/.bun/bin:\$PATH\" CLAUDE_CODE_OAUTH_TOKEN=\"$TOKEN\" && claude --channels plugin:telegram@claude-plugins-official --dangerously-skip-permissions --effort high --model opus" Enter
+LAUNCH
 ```
 
-**Important:** First launch needs interactive theme selection. Tell the user:
-"You need to attach to each tmux session once and press Enter to select the theme. After that it runs headless."
+Tell the user:
 
-```bash
+"Almost done! The first time Claude Code starts, it asks you to pick a theme. You need to SSH into the server once and press Enter in each session. Run this in your terminal:"
+
+```
+ssh <server>
 TERM=xterm-256color tmux attach -t <PROJECT_NAME>
-# Press Enter for theme
-# Ctrl-b d to detach
 ```
 
-## Step 6: Verify
+"Press Enter to pick the theme, then Ctrl-b d to detach. Do this for each project."
 
-After the user completes theme selection:
+## Phase 6: Pairing
+
+After the user completes theme selection, tell them:
+
+"Now send any message to your bot in Telegram. It will reply with a pairing code. Then attach to the session again and run `/telegram:access pair <CODE>`."
+
+## Phase 7: Test
 
 ```bash
-# Check bots are running
-ps aux | grep "bun server.ts" | grep -v grep
+ssh <server> 'ps aux | grep "bun server" | grep -v grep'
+```
 
-# Check PID files (zombie fix working)
-ls -la ~/.claude/channels/telegram-*/server.pid 2>/dev/null
+Tell the user: "Everything is running. Try sending a text message, then a voice message to your bot in Telegram."
 
-# Check tmux sessions
+If they confirm it works: "You're all set! The server runs 24/7 — you can close your laptop and keep chatting via Telegram."
+
+## Quick Reference (show at the end)
+
+```
+# Connect to server
+ssh <server-command>
+
+# Attach to project session
+TERM=xterm-256color tmux attach -t <project>
+
+# Detach
+Ctrl-b d
+
+# List sessions
 tmux list-sessions
+
+# Restart a session
+tmux send-keys -t <project> C-c
+# then re-run the claude command
 ```
 
-Tell the user: "Send a text message to your bot in Telegram. Then try a voice message."
+## Important
 
-## Step 7: Pairing
-
-Each Telegram bot needs pairing. Tell the user:
-1. Send any message to the bot in Telegram
-2. The bot will reply with a pairing code
-3. Attach to the tmux session: `TERM=xterm-256color tmux attach -t <name>`
-4. Run: `/telegram:access pair <CODE>`
-
-## Troubleshooting
-
-### Plugin not found after claude -p
-The plugin downloads asynchronously. Try running `claude -p "ok"` again, or manually clone as shown in Step 2.
-
-### "Channels require claude.ai authentication"
-The `CLAUDE_CODE_OAUTH_TOKEN` env var is not set. Run:
-```bash
-source ~/.bashrc
-echo $CLAUDE_CODE_OAUTH_TOKEN | head -c 20
-```
-If empty, check `~/.claude/.setup-token` exists.
-
-### "API Usage Billing" instead of subscription
-`ANTHROPIC_API_KEY` is overriding OAuth. Remove it:
-```bash
-unset ANTHROPIC_API_KEY
-sed -i '/ANTHROPIC_API_KEY/d' ~/.bashrc
-```
-
-### Voice messages not transcribed
-Check whisper-cpp is installed and model exists:
-```bash
-which whisper-cpp
-ls ~/.local/share/whisper-models/
-```
-Check `TELEGRAM_WHISPER_MODEL` in project settings points to correct path.
-
-### tmux terminal error
-Use: `TERM=xterm-256color tmux attach -t <name>`
-
-## Important Notes
-
-- NEVER display or log bot tokens — they are secrets
-- `chmod 600` on all `.env` and `.setup-token` files
-- Plugin updates may overwrite patches — re-apply after Claude Code updates
-- One bot token = one consumer. Don't run the same bot on two machines.
+- NEVER display or log bot tokens or OAuth tokens
+- `chmod 600` on all secret files
+- One bot token = one consumer — don't run the same bot on two machines
+- Plugin updates may overwrite patches — re-apply from ~/claude-telegram-upgrade after updates
