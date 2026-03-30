@@ -40,6 +40,10 @@ You just answer questions and follow simple instructions when needed (like creat
 - SSH access to a VPS (or Claude can help you set one up)
 - Telegram account
 
+Works on macOS and Linux. Windows users: use WSL2.
+
+No incoming ports need to be opened — the bot uses outgoing HTTPS connections to Telegram's API.
+
 ## Architecture
 
 ```

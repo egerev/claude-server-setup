@@ -104,6 +104,23 @@ export CLAUDE_CODE_OAUTH_TOKEN=$(cat ~/.claude/.setup-token 2>/dev/null | tr -d 
 BASHRC'
 ```
 
+### 3.5a GitHub CLI authentication
+
+Check if GitHub CLI is authenticated:
+```bash
+ssh <server> "gh auth status 2>&1 || echo 'NOT AUTHENTICATED'"
+```
+
+If not authenticated, guide the user to run device auth on the server:
+```bash
+ssh <server> "gh auth login --web"
+```
+
+Or, if they have a GitHub token, use:
+```bash
+ssh <server> "echo '<GITHUB_TOKEN>' | gh auth login --with-token"
+```
+
 ### 3.6 Claude Code settings
 ```bash
 ssh <server> 'cat > ~/.claude/settings.json << '\''JSON'\''
@@ -138,7 +155,7 @@ curl -L --progress-bar -o ~/.local/share/whisper-models/ggml-<MODEL>.bin "https:
 WHISPER
 ```
 
-### 3.8 Telegram plugin + patches
+### 3.9 Telegram plugin + patches
 ```bash
 ssh <server> 'bash -s' << 'TELEGRAM'
 export PATH="$HOME/.bun/bin:$PATH"
@@ -171,6 +188,8 @@ TELEGRAM
 ```
 
 Tell the user: "Base installation complete. Now let's set up your Telegram bot."
+
+> **Note:** Most steps in Phase 3 are idempotent — if your SSH connection drops at any point, it's safe to re-run the commands from where you left off.
 
 ## Phase 4: Telegram Bot Setup
 
@@ -259,7 +278,20 @@ TERM=xterm-256color tmux attach -t <PROJECT_NAME>
 
 After the user completes theme selection, tell them:
 
-"Now send any message to your bot in Telegram. It will reply with a pairing code. Then attach to the session again and run `/telegram:access pair <CODE>`."
+"Now send any message to your bot in Telegram (e.g., 'hi'). **The bot will reply directly in Telegram** with a pairing code — 5 lowercase letters, like `abcde`.
+
+Then attach to the tmux session:
+```
+ssh <server>
+TERM=xterm-256color tmux attach -t <PROJECT_NAME>
+```
+
+At the `>` prompt inside Claude Code, type:
+```
+/telegram:access pair <CODE>
+```
+
+Replace `<CODE>` with the 5-letter code the bot sent you in Telegram. Press Enter. Claude will confirm the pairing. Then Ctrl-b d to detach."
 
 ## Phase 7: Test
 
@@ -270,6 +302,38 @@ ssh <server> 'ps aux | grep "bun server" | grep -v grep'
 Tell the user: "Everything is running. Try sending a text message, then a voice message to your bot in Telegram."
 
 If they confirm it works: "You're all set! The server runs 24/7 — you can close your laptop and keep chatting via Telegram."
+
+## Phase 8: Reboot Recovery (optional but recommended)
+
+Create a restart script so sessions survive server reboots:
+
+```bash
+ssh <server> 'cat > ~/restart-claude.sh << '\''SCRIPT'\''
+#!/bin/bash
+TOKEN=$(cat ~/.claude/.setup-token | tr -d "[:space:]")
+export PATH="$HOME/.bun/bin:$PATH"
+
+for dir in ~/projects/*/; do
+  PROJECT=$(basename "$dir")
+  SETTINGS="$dir/.claude/settings.local.json"
+  [ -f "$SETTINGS" ] || continue
+
+  tmux has-session -t "$PROJECT" 2>/dev/null && continue
+
+  tmux new-session -d -s "$PROJECT" -c "$dir"
+  tmux send-keys -t "$PROJECT" "export PATH=\"\$HOME/.bun/bin:\$PATH\" CLAUDE_CODE_OAUTH_TOKEN=\"$TOKEN\" && claude --channels plugin:telegram@claude-plugins-official --dangerously-skip-permissions --effort high --model opus" Enter
+  echo "Started: $PROJECT"
+done
+SCRIPT
+chmod +x ~/restart-claude.sh'
+```
+
+Add to crontab:
+```bash
+ssh <server> '(crontab -l 2>/dev/null; echo "@reboot sleep 30 && /home/$(whoami)/restart-claude.sh >> /home/$(whoami)/claude-restart.log 2>&1") | crontab -'
+```
+
+Tell the user: "I've set up auto-restart. If the server reboots, Claude Code sessions will restart automatically after 30 seconds."
 
 ## Quick Reference (show at the end)
 

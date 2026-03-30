@@ -30,7 +30,7 @@ echo ""
 
 # System essentials
 sudo apt-get update -qq
-sudo apt-get install -y -qq git curl tmux jq > /dev/null 2>&1
+sudo apt-get install -y -qq git curl tmux jq ffmpeg cmake build-essential > /dev/null 2>&1
 
 # Node.js
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - > /dev/null 2>&1
