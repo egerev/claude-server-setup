@@ -252,6 +252,29 @@ JSON
 PROJECT
 ```
 
+Add Telegram communication guidelines to the project's CLAUDE.md so Claude sends progress updates instead of going silent:
+
+```bash
+ssh <server> 'cat >> ~/projects/<REPO>/CLAUDE.md << '\''MD'\''
+
+## Telegram Communication
+
+This is a Telegram session. The user is on their phone and CANNOT see your terminal. They only see messages you explicitly send via the reply tool. Everything else — your thinking, tool calls, file reads, command output — is invisible to them.
+
+**You are their only window into what is happening. Act accordingly:**
+
+- When you start working, say what you are about to do: "Reading the config file..."
+- Send progress updates every 20-30 seconds while working
+- When running commands (tests, builds), tell the user and share the result
+- Keep messages short — the user is on a phone screen
+- Summarize file contents and command output instead of dumping raw text
+- When done, clearly state what changed: "Fixed the bug in line 42, pushed to main"
+- If something fails, explain what happened and what you will try next
+- Voice messages arrive as `[voice]: transcribed text`
+- The user can send CLI commands: /compact, /clear, /model, /effort
+MD'
+```
+
 Ask: "Want to add another project with a different bot? Or is one enough for now?"
 
 Repeat Phase 4 for each additional project.
