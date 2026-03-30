@@ -174,11 +174,29 @@ Tell the user: "Base installation complete. Now let's set up your Telegram bot."
 
 ## Phase 4: Telegram Bot Setup
 
-Tell the user:
+Ask: "Do you already have a Telegram bot token, or do we need to create one?"
 
-"Open Telegram on your phone, search for @BotFather, send `/newbot`, and follow the steps. Then paste the bot token here (format: `123456789:AAH...`)"
+If they need to create one, walk them through step by step:
 
-If they already have a bot token, skip to configuration.
+---
+
+Let's create a Telegram bot. It takes about 1 minute:
+
+1. Open **Telegram** on your phone or desktop
+2. Search for **@BotFather** (it has a blue checkmark)
+3. Tap **Start** (or send `/start`)
+4. Send: `/newbot`
+5. BotFather will ask for a **name** — this is what users see (e.g., "My Claude Assistant")
+6. Then it asks for a **username** — must end in `bot` (e.g., `my_claude_bot`)
+7. BotFather will reply with your **token** — it looks like `123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw`
+
+Copy that token and paste it here. Don't share it publicly — anyone with this token can control your bot.
+
+---
+
+If they want multiple projects with separate bots, tell them: "You can repeat this process to create additional bots — one per project. Each gets its own token."
+
+After receiving the token:
 
 Ask: "What should I call this project? (e.g., `myproject`, `work`, `personal`)"
 
