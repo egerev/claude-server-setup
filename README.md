@@ -12,7 +12,11 @@ Run Claude Code 24/7 on a cloud server with Telegram integration. Chat with your
 
 ## How to Set Up
 
-Just share this repo with Claude Code and let it handle everything.
+Just share this repo with Claude Code and let it handle everything. Alternatively, run the setup script directly — it will prompt for your token interactively:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/egerev/claude-server-setup/main/setup.sh | bash
+```
 
 ```
 You: Hey, I want to set up a cloud server for Claude Code with Telegram.
@@ -66,6 +70,13 @@ Cloud Server (Ubuntu VPS)
 | ffmpeg | Audio format conversion |
 | GitHub CLI | Repo management |
 | tmux | Persistent sessions |
+
+## Security Considerations
+
+- **`--dangerously-skip-permissions`** disables all permission prompts in Claude Code. Claude can read, write, and execute anything on the server without asking. Only use this on a server you control and trust.
+- **Telegram access = code execution.** Anyone who can send messages to your paired bot can instruct Claude to run arbitrary commands. Use a private bot and keep the bot token secret. Do not share bot tokens or add untrusted users to the allowlist.
+- **Personal servers only.** This setup is designed for single-user personal servers. Do not run on shared infrastructure or expose the bot publicly.
+- **Token storage.** The OAuth token is stored in `~/.claude/.setup-token` and `~/.claude/.env`, both with `chmod 600` permissions (owner read/write only). The bot token is stored in `~/.claude/channels/telegram-<project>/.env`, also `chmod 600`.
 
 ## License
 

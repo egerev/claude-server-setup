@@ -1,26 +1,25 @@
 #!/bin/bash
 # Claude Code Cloud Server — Bootstrap
-# Usage: curl -fsSL https://raw.githubusercontent.com/egerev/claude-server-setup/main/setup.sh | bash -s -- <OAUTH_TOKEN>
+# Usage: curl -fsSL https://raw.githubusercontent.com/egerev/claude-server-setup/main/setup.sh | bash
 #
 # This script installs the minimum needed to run Claude Code.
 # Claude Code then handles everything else (Telegram, whisper, projects, tmux).
 
 set -euo pipefail
 
-TOKEN="${1:-}"
+echo ""
+echo "  Claude Code Cloud Server Setup"
+echo "  ───────────────────────────────"
+echo ""
+echo "  First, get your token (run on your local machine):"
+echo "    claude setup-token"
+echo "    cat ~/.claude/.setup-token"
+echo ""
+read -s -p "  Paste your Claude setup token: " TOKEN; echo
+echo ""
 
 if [ -z "$TOKEN" ]; then
-  echo ""
-  echo "  Claude Code Cloud Server Setup"
-  echo "  ───────────────────────────────"
-  echo ""
-  echo "  Usage:"
-  echo "    curl -fsSL <url> | bash -s -- <TOKEN>"
-  echo ""
-  echo "  Get your token (run on your local machine):"
-  echo "    claude setup-token"
-  echo "    cat ~/.claude/.setup-token"
-  echo ""
+  echo "  Error: no token provided. Exiting."
   exit 1
 fi
 
@@ -54,13 +53,16 @@ mkdir -p ~/.claude
 echo -n "$TOKEN" > ~/.claude/.setup-token
 chmod 600 ~/.claude/.setup-token
 
-# Environment
+# Store token in dedicated env file (not in .bashrc)
+echo "export CLAUDE_CODE_OAUTH_TOKEN=$(cat ~/.claude/.setup-token | tr -d '[:space:]')" > ~/.claude/.env
+chmod 600 ~/.claude/.env
+
+# Environment — only PATH in .bashrc
 grep -q "BUN_INSTALL" ~/.bashrc 2>/dev/null || cat >> ~/.bashrc << 'BASHRC'
 
 # Claude Code
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
-export CLAUDE_CODE_OAUTH_TOKEN=$(cat ~/.claude/.setup-token 2>/dev/null | tr -d '[:space:]')
 BASHRC
 
 # Clone setup repo (has CLAUDE.md with full instructions)

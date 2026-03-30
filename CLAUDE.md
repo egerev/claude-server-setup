@@ -100,8 +100,12 @@ ssh <server> 'grep -q "BUN_INSTALL" ~/.bashrc || cat >> ~/.bashrc << '\''BASHRC'
 
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
-export CLAUDE_CODE_OAUTH_TOKEN=$(cat ~/.claude/.setup-token 2>/dev/null | tr -d "[:space:]")
 BASHRC'
+```
+
+Store the token in a dedicated env file (not in .bashrc):
+```bash
+ssh <server> 'mkdir -p ~/.claude && echo "export CLAUDE_CODE_OAUTH_TOKEN=$(cat ~/.claude/.setup-token | tr -d '"'"'[:space:]'"'"')" > ~/.claude/.env && chmod 600 ~/.claude/.env'
 ```
 
 ### 3.5a GitHub CLI authentication
@@ -133,8 +137,11 @@ ssh <server> 'cat > ~/.claude/settings.json << '\''JSON'\''
 JSON'
 ```
 
-### 3.7 Install Superflow skill
+### 3.7 Superflow skill (optional)
 
+Ask: "Would you also like to install Superflow for project management workflows? (optional)"
+
+Only install if the user says yes:
 ```bash
 ssh <server> 'mkdir -p ~/.claude/commands && cd ~/.claude/commands && git clone https://github.com/egerev/superflow.git 2>/dev/null || true'
 ```
@@ -251,15 +258,18 @@ Repeat Phase 4 for each additional project.
 
 ## Phase 5: Launch
 
+Ask: "Which Claude model do you want to use? Options: `opus` (most capable, requires Max plan), `sonnet` (fast, works with Pro plan). Default: sonnet"
+
+If they choose opus, add `--model opus` to the launch command. If sonnet (or they don't know), use `--model sonnet`. Default to sonnet.
+
 For each project:
 
 ```bash
 ssh <server> 'bash -s' << 'LAUNCH'
 export PATH="$HOME/.bun/bin:$PATH"
-TOKEN=$(cat ~/.claude/.setup-token | tr -d '[:space:]')
 
 tmux new-session -d -s <PROJECT_NAME> -c ~/projects/<REPO>
-tmux send-keys -t <PROJECT_NAME> "export PATH=\"\$HOME/.bun/bin:\$PATH\" CLAUDE_CODE_OAUTH_TOKEN=\"$TOKEN\" && claude --channels plugin:telegram@claude-plugins-official --dangerously-skip-permissions --effort high --model opus" Enter
+tmux send-keys -t <PROJECT_NAME> "source ~/.claude/.env && export PATH=\"\$HOME/.bun/bin:\$PATH\" && claude --channels plugin:telegram@claude-plugins-official --dangerously-skip-permissions --effort high --model <MODEL>" Enter
 LAUNCH
 ```
 
@@ -310,7 +320,7 @@ Create a restart script so sessions survive server reboots:
 ```bash
 ssh <server> 'cat > ~/restart-claude.sh << '\''SCRIPT'\''
 #!/bin/bash
-TOKEN=$(cat ~/.claude/.setup-token | tr -d "[:space:]")
+source ~/.claude/.env
 export PATH="$HOME/.bun/bin:$PATH"
 
 for dir in ~/projects/*/; do
@@ -321,7 +331,7 @@ for dir in ~/projects/*/; do
   tmux has-session -t "$PROJECT" 2>/dev/null && continue
 
   tmux new-session -d -s "$PROJECT" -c "$dir"
-  tmux send-keys -t "$PROJECT" "export PATH=\"\$HOME/.bun/bin:\$PATH\" CLAUDE_CODE_OAUTH_TOKEN=\"$TOKEN\" && claude --channels plugin:telegram@claude-plugins-official --dangerously-skip-permissions --effort high --model opus" Enter
+  tmux send-keys -t "$PROJECT" "source ~/.claude/.env && export PATH=\"\$HOME/.bun/bin:\$PATH\" && claude --channels plugin:telegram@claude-plugins-official --dangerously-skip-permissions --effort high --model sonnet" Enter
   echo "Started: $PROJECT"
 done
 SCRIPT
