@@ -334,7 +334,19 @@ ssh <server> 'cat > ~/start-claude.sh << '\''SCRIPT'\''
 source ~/.claude/.env 2>/dev/null
 export PATH="$HOME/.bun/bin:$PATH"
 
+# Kill orphaned bun server.ts processes (parent PID 1 = orphan)
+cleanup_orphans() {
+  for pid in $(pgrep -f "bun server.ts" 2>/dev/null); do
+    ppid=$(ps -o ppid= -p $pid 2>/dev/null | tr -d " ")
+    if [ "$ppid" = "1" ]; then
+      kill -9 $pid 2>/dev/null
+      echo "Killed orphaned bun server.ts (PID $pid)"
+    fi
+  done
+}
+
 while true; do
+  cleanup_orphans
   claude --channels plugin:telegram@claude-plugins-official --dangerously-skip-permissions --effort high --model ${1:-sonnet}
   echo "Claude Code exited. Restarting in 5 seconds..."
   sleep 5
