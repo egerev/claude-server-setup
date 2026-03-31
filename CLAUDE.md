@@ -285,6 +285,66 @@ Ask: "Which Claude model do you want to use? Options: `opus` (most capable, requ
 
 If they choose opus, add `--model opus` to the launch command. If sonnet (or they don't know), use `--model sonnet`. Default to sonnet.
 
+### Install claude-status-line (for /dash command)
+
+```bash
+ssh <server> 'bash -s' << 'STATUSLINE'
+cd ~
+git clone https://github.com/egerev/claude-status-line.git 2>/dev/null || true
+CLAUDE_DIR="$HOME/.claude"
+mkdir -p "$CLAUDE_DIR/status_lines" "$CLAUDE_DIR/hooks" "$CLAUDE_DIR/data/sessions"
+cp ~/claude-status-line/status_line.py "$CLAUDE_DIR/status_lines/status_line.py"
+cp ~/claude-status-line/hook_prompt_submit.py "$CLAUDE_DIR/hooks/hook_prompt_submit.py"
+
+# Patch status_line.py to dump data for /dash
+python3 -c "
+p = '$CLAUDE_DIR/status_lines/status_line.py'
+c = open(p).read()
+old = 'data = json.loads(sys.stdin.read())'
+new = '''data = json.loads(sys.stdin.read())
+        try:
+            dp = Path.home() / \".claude\" / \"data\" / \"last_status.json\"
+            dp.parent.mkdir(parents=True, exist_ok=True)
+            dp.write_text(json.dumps(data, ensure_ascii=False))
+        except Exception:
+            pass'''
+open(p, 'w').write(c.replace(old, new, 1))
+"
+
+# Update settings.json
+python3 -c "
+import json
+p = '$CLAUDE_DIR/settings.json'
+s = json.loads(open(p).read())
+s['statusLine'] = {'type': 'command', 'command': 'python3 $CLAUDE_DIR/status_lines/status_line.py', 'padding': 0}
+h = s.setdefault('hooks', {}).setdefault('UserPromptSubmit', [])
+if not any('hook_prompt_submit' in hh.get('command','') for b in h for hh in b.get('hooks',[])):
+    h.append({'hooks': [{'type': 'command', 'command': 'python3 $CLAUDE_DIR/hooks/hook_prompt_submit.py'}]})
+open(p, 'w').write(json.dumps(s, indent=2))
+"
+echo "Status line installed"
+STATUSLINE
+```
+
+### Create auto-restart wrapper
+
+```bash
+ssh <server> 'cat > ~/start-claude.sh << '\''SCRIPT'\''
+#!/bin/bash
+source ~/.claude/.env 2>/dev/null
+export PATH="$HOME/.bun/bin:$PATH"
+
+while true; do
+  claude --channels plugin:telegram@claude-plugins-official --dangerously-skip-permissions --effort high --model ${1:-sonnet}
+  echo "Claude Code exited. Restarting in 5 seconds..."
+  sleep 5
+done
+SCRIPT
+chmod +x ~/start-claude.sh'
+```
+
+### Launch sessions
+
 For each project:
 
 ```bash
@@ -292,7 +352,7 @@ ssh <server> 'bash -s' << 'LAUNCH'
 export PATH="$HOME/.bun/bin:$PATH"
 
 tmux new-session -d -s <PROJECT_NAME> -c ~/projects/<REPO>
-tmux send-keys -t <PROJECT_NAME> "source ~/.claude/.env && export PATH=\"\$HOME/.bun/bin:\$PATH\" && claude --channels plugin:telegram@claude-plugins-official --dangerously-skip-permissions --effort high --model <MODEL>" Enter
+tmux send-keys -t <PROJECT_NAME> "~/start-claude.sh <MODEL>" Enter
 LAUNCH
 ```
 
