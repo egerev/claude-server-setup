@@ -431,6 +431,8 @@ for dir in ~/projects/*/; do
 done
 SCRIPT
 chmod +x ~/restart-claude.sh'
+
+Note: The restart script patches the Telegram plugin before each session start and adds delays between sessions. This is needed because Claude Code recreates the plugin directory on startup, overwriting patches.'
 ```
 
 Add to crontab:
