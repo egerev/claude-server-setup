@@ -60,6 +60,15 @@ Cloud Server (Ubuntu VPS)
     └── whisper-cpp (voice → text, local)
 ```
 
+## Fully Autonomous by Design
+
+This setup grants Claude Code **maximum permissions** on the server. Why? Because Telegram's permission approval system has [known bugs](https://github.com/anthropics/claude-code/issues/40016) — approvals get lost, only the first one goes through, and `.claude/` directory prompts bypass the channel entirely. On a headless server with no terminal access, a stuck permission prompt means a dead bot.
+
+Our approach: pre-approve everything in `settings.local.json` so Claude Code never stops to ask. This is safe because:
+- Each project runs in an isolated directory
+- The server is single-user (your account only)
+- Telegram pairing ensures only you can send commands
+
 ## What Gets Installed
 
 | Component | Purpose |

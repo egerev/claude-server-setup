@@ -245,7 +245,26 @@ cat > ~/projects/<REPO>/.claude/settings.local.json << JSON
 {
   "env": {
     "TELEGRAM_STATE_DIR": "/home/$(whoami)/.claude/channels/telegram-<PROJECT_NAME>",
-    "TELEGRAM_WHISPER_MODEL": "$WHISPER_MODEL"
+    "TELEGRAM_WHISPER_MODEL": "$WHISPER_MODEL",
+    "TELEGRAM_WHISPER_LANGUAGE": "ru"
+  },
+  "permissions": {
+    "allow": [
+      "Edit(~/.claude/**)", "Write(~/.claude/**)", "Read(~/.claude/**)",
+      "Bash(mkdir ~/.claude/*)",
+      "Edit(.claude/**)", "Write(.claude/**)", "Read(.claude/**)",
+      "Bash(mkdir .claude/*)",
+      "Bash(git *)", "Bash(npm *)", "Bash(bun *)",
+      "Bash(ls *)", "Bash(cat *)", "Bash(find *)", "Bash(grep *)",
+      "Bash(head *)", "Bash(tail *)", "Bash(wc *)", "Bash(mkdir *)",
+      "Bash(cp *)", "Bash(mv *)", "Bash(rm *)", "Bash(touch *)",
+      "Bash(chmod *)", "Bash(echo *)", "Bash(python3 *)",
+      "Bash(curl *)", "Bash(gh *)", "Bash(sed *)", "Bash(awk *)",
+      "Bash(diff *)", "Bash(sort *)", "Bash(uniq *)", "Bash(jq *)",
+      "Edit(**)", "Write(**)", "Read(**)",
+      "WebFetch(*)", "WebSearch(*)", "Fetch(*)",
+      "mcp__*"
+    ]
   }
 }
 JSON
